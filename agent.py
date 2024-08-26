@@ -113,13 +113,13 @@ class RLAgent:
         self.policy_net = DQN(self.input_dim, self.get_default_hyperparameters()).to(self.device)
         self.target_net = DQN(self.input_dim, self.get_default_hyperparameters()).to(self.device)
 
-        self.lr = 0.001
+        self.lr = 0.001 # 0.001 for first experiments, 0.00005
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
         self.memory = deque(maxlen=10000)
         self.batch_size = 32
         self.gamma = 1.0
         self.epsilon = 1.0
-        self.epsilon_decay = 0.999925
+        self.epsilon_decay = 0.995 # 0.99925 0.9995
         self.epsilon_min = 0.01
         self.color = color
         self.is_trainable = True
@@ -128,15 +128,10 @@ class RLAgent:
         self.best_checkpoint = DQN(self.input_dim, self.get_default_hyperparameters()).to(self.device)
         self.best_validation_performance = 0.
         self.validation_check_interval = 100
-
-        
     
     def reset(self):
         self.num_nodes_selected = 0
         self.current_step = 0
-
-    def setup_graphs(train_graphs, validation_graphs):
-        pass
 
     def get_default_hyperparameters(self):
         hyperparams = {'hidden_gnn': 32,
@@ -151,7 +146,7 @@ class RLAgent:
         else:
             with torch.no_grad():      
                 edge_index, node_states, _ = state
-                data = Data(x=node_states, edge_index=edge_index)
+                data = Data(x=node_states, edge_index=edge_index).to(self.device)
                 q_values = self.policy_net(data).squeeze()
                 possible_actions = torch.tensor(actions, dtype=torch.long).to(self.device)
                 possible_q_values = q_values[torch.tensor(actions)]
@@ -191,11 +186,11 @@ class RLAgent:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
 
-        # q_values = self.policy_net(data_policy)
-        # q_values = q_values.view(self.batch_size, -1).gather(1, actions).squeeze()
+        q_values_raw = self.policy_net(data_policy)
+
+        # q_values = q_values_raw.view(self.batch_size, -1).gather(1, actions).squeeze()
         # next_q_values = self.target_net(data_target).view(self.batch_size, -1).max(1)[0]
         
-        q_values_raw = self.policy_net(data_policy)
         q_values_dense, _ = to_dense_batch(q_values_raw, data_policy.batch)
         q_values = q_values_dense.gather(1, actions.unsqueeze(-1)).squeeze(-1).squeeze(-1)
         next_q_values_raw = self.target_net(data_target)

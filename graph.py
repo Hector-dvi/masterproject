@@ -126,6 +126,7 @@ class GraphGenerator():
         self.validation_ratio = validation_ratio
         self.test_ratio = test_ratio
         self.ratios = [self.train_ratio, self.validation_ratio, self.test_ratio]
+
         self.clear()
 
     def clear(self):

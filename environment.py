@@ -162,6 +162,7 @@ class RLEnv(Graph): # Multi Agent Competitive Diffusion
 
     def agent_step(self, num_selection):
         action = []
+
         for id, agent in self.agents.items():
             if self.check_termination():
                 return action
