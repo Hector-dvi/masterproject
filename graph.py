@@ -7,6 +7,8 @@ import random
 
 GRAPHS_DIR = "./Graphs"
 
+from agent import IMAgent
+
 class Graph:
     def __init__(self):
         self.node_positions = None
@@ -38,7 +40,7 @@ class Graph:
         self.graph = nx.from_pandas_edgelist(edges_df, '# source', ' target')
         self.node_positions = nx.spring_layout(self.graph)
 
-    def load_gaph(self, graph):
+    def load_graph(self, graph):
         self.graph = graph
 
     def get_num_nodes(self):
@@ -201,7 +203,7 @@ class SIR(Graph):
     def display(self, with_labels=False, width=0.5, edge_color="gray", edgecolors="black"):
 
         if self.node_positions is None:
-            raise ValueError("Node positions not initialized.")
+            self.node_positions = nx.spring_layout(self.graph)
         
         node_colors = [
             self.im_agent.color if self.graph.nodes[node]["state"] == "I" 
@@ -284,6 +286,12 @@ class MACD(Graph): # Multi Agent Competitive Diffusion
         self.diffusion_method = diffusion_method
         self.infected = {}
 
+    def reset(self):
+        self.infected = {}
+
+    def set_diffusion_method(self, diffusion_method):
+        self.diffusion_method = diffusion_method
+
     def set_node_attribute(self, node_id, name, value):
         super().set_node_attribute(node_id, name, value)
         if name == "state" and value != "S": self.infected[node_id] = value
@@ -327,7 +335,7 @@ class MACD(Graph): # Multi Agent Competitive Diffusion
     def display(self, with_labels=False, width=0.5, edge_color="gray", edgecolors="black"):
 
         if self.node_positions is None:
-            raise ValueError("Node positions not initialized.")
+            self.node_positions = nx.spring_layout(self.graph)
         
         node_colors = [
             "white" if self.graph.nodes[node]["state"] == "S" 
@@ -440,8 +448,8 @@ class MACD(Graph): # Multi Agent Competitive Diffusion
 
     def run(self, num_diffusion_steps, verbose=False):
 
-        for agent_id in self.agents:
-            self.agent_step(agent_id, 0)
+        # for agent_id in self.agents:
+        #     self.agent_step(agent_id, 0)
 
         if verbose: self.display()
 
@@ -457,75 +465,4 @@ class MACD(Graph): # Multi Agent Competitive Diffusion
                     self.diffusion_tp_step(verbose=verbose)
 
         return self.get_influence_ratios()
-    
-
-
-if __name__ == "__main__":
-    ratio_list = np.array([])
-    # num_experiments = 0
-    # # node_selection_method = "degree_centrality"
-    # node_selection_methods = ["random","degree_centrality","closeness_centrality","betweenness_centrality","eigenvector_centrality","LIR"]
-    # im_agent_id = 0
-    # budget = 3
-    # ad_agent_id = 1
-    # ad_agent_type = "random"
-    # graph_type = "WS"
-    # num_nodes = [50]
-    # edges_to_new_node = [3]
-    # prob = [0.2]
-    # num_diffusion_steps = 5
-    # verbose = True
-
-    # graph_types = ["BA","WS"]
-
-    # # agent_0 = IMAgent(im_agent_id, "LIR", budget, transmission_probability=0.1, color="red")
-    # # agent_1 = IMAgent(ad_agent_id, "random", budget, transmission_probability=0.1, color="blue")
-    # # agent_2 = IMAgent(2, "eigenvector_centrality", budget, color="green")
-    # # agent_ad = RandomAgent(1)
-    # # agents = {im_agent_id: agent_0, ad_agent_id: agent_1}
-    # # model = SIR(agent_0, agent_ad)
-    # # model.generate_watts_strogatz_graph(50, 4, 0.2)
-
-    # agent_0 = IMAgent(0, "random", budget, transmission_probability=0.1, color="red")
-    # agent_1 = IMAgent(1, "random", budget, transmission_probability=0.1, color="blue")
-    # agent_2 = IMAgent(2, "random", budget, transmission_probability=0.1, color="green")
-    # agent_3 = IMAgent(3, "random", budget, transmission_probability=0.1, color="yellow")
-    # agents = {0: agent_0,
-    #           1: agent_1, 
-    #           2: agent_2, 
-    #           3: agent_3}
-    # model = MACD(agents, diffusion_method="stochastic")
-    # # model.load_facebook_graph("gplus_101133961721621664586")
-    # model.generate_barabasi_albert_graph(100, 3)
-    # ratios = model.run(num_diffusion_steps,verbose=verbose)
-    # # print(ratios)
-    
-    # for graph_type in graph_types:
-    #     print(f'{graph_type}:')
-    #     for selection_method in node_selection_methods:
-    #         ratio_list = np.array([])
-    #         for n in num_nodes:
-    #             for m in edges_to_new_node:
-    #                 if graph_type=="BA":
-    #                     for exp in range(num_experiments):
-    #                         agent_0 = IMAgent(im_agent_id, selection_method, budget, transmission_probability=0.1, color="red")
-    #                         model = SIR(agent_0)
-    #                         model.generate_barabasi_albert_graph(n, m, seed=exp)
-    #                         ratio = model.run(num_diffusion_steps=num_diffusion_steps,verbose=False)
-    #                         ratio_list = np.append(ratio_list,ratio)
-    #                 else:
-    #                     for p in prob:
-    #                         ratio_list = np.array([])
-    #                         for exp in range(num_experiments):
-    #                             agent_0 = IMAgent(im_agent_id, selection_method, budget, transmission_probability=0.1, color="red")
-    #                             model = SIR(agent_0)
-    #                             model.generate_watts_strogatz_graph(n, m, p, seed=exp)
-    #                             ratio = model.run(num_diffusion_steps=num_diffusion_steps,verbose=False)
-    #                             ratio_list = np.append(ratio_list,ratio)
-    #         mean = ratio_list.mean()
-    #         std = ratio_list.std()
-    #         standard_error = std / np.sqrt(num_experiments)
-    #         margin_error = standard_error * 1.96 # 95% interval
-    #         print(selection_method, round(mean,3), round(margin_error,3))
-        
     

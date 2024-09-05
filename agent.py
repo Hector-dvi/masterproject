@@ -103,6 +103,8 @@ class RLAgent:
         self.budget = budget
         self.num_nodes_selected = 0
         self.current_step = 0
+        self.color = color
+        self.is_trainable = True
 
         if device == "GPU" and torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -113,18 +115,9 @@ class RLAgent:
         self.policy_net = DQN(self.input_dim, self.get_default_hyperparameters()).to(self.device)
         self.target_net = DQN(self.input_dim, self.get_default_hyperparameters()).to(self.device)
 
-        self.lr = 0.001 # 0.001 for first experiments, 0.00005
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
-        self.memory = deque(maxlen=10000)
-        self.batch_size = 32
-        self.gamma = 1.0
-        self.epsilon = 1.0
-        self.epsilon_decay = 0.995 # 0.99925 0.9995
-        self.epsilon_min = 0.01
-        self.color = color
-        self.is_trainable = True
+        self.get_default_training_parameters()
+        
         self.net_copy_interval = 50
-
         self.best_checkpoint = DQN(self.input_dim, self.get_default_hyperparameters()).to(self.device)
         self.best_validation_performance = 0.
         self.validation_check_interval = 100
@@ -133,11 +126,37 @@ class RLAgent:
         self.num_nodes_selected = 0
         self.current_step = 0
 
+    def get_default_training_parameters(self):
+        self.lr = 0.001 # 0.001 for first experiments, 0.00005
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
+        self.memory = deque(maxlen=10000)
+        self.batch_size = 32
+        self.gamma = 1.0
+        self.epsilon = 1.0
+        self.epsilon_decay = 0.995 # 0.99925 0.9995
+        self.epsilon_min = 0.01
+
+    def set_optimizer(self, optim):
+        self.optimizer = optim
+
+    def set_default_training_parameters(self, lr, memory_size, batch_size, epsilon_decay, epsilon_min):
+        self.lr = lr
+        self.memory = deque(maxlen=memory_size)
+        self.batch_size = batch_size
+        self.epsilon_decay = epsilon_decay
+        self.epsilon_min =epsilon_min
+
     def get_default_hyperparameters(self):
-        hyperparams = {'hidden_gnn': 32,
+        self.hyperparams = {'hidden_gnn': 32,
                        'latent_dim': 64,
                        'hidden_dqn': 32}
-        return hyperparams
+        return self.hyperparams
+    
+    def set_default_hyperparameters(self, hyperparams):
+        self.hyperparams = hyperparams
+        self.policy_net = DQN(self.input_dim, hyperparams).to(self.device)
+        self.target_net = DQN(self.input_dim, hyperparams).to(self.device)
+        self.best_checkpoint = DQN(self.input_dim, hyperparams).to(self.device)
 
     def select_action(self, state, actions, num_selection):
 
@@ -187,10 +206,6 @@ class RLAgent:
         dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
 
         q_values_raw = self.policy_net(data_policy)
-
-        # q_values = q_values_raw.view(self.batch_size, -1).gather(1, actions).squeeze()
-        # next_q_values = self.target_net(data_target).view(self.batch_size, -1).max(1)[0]
-        
         q_values_dense, _ = to_dense_batch(q_values_raw, data_policy.batch)
         q_values = q_values_dense.gather(1, actions.unsqueeze(-1)).squeeze(-1).squeeze(-1)
         next_q_values_raw = self.target_net(data_target)
@@ -230,198 +245,5 @@ class RLAgent:
     def restore_last_checkpoint(self):
         self.policy_net.load_state_dict(self.best_checkpoint.state_dict())
         self.take_snapshot()
-
-
-# class RLAgent2:
-
-#     def __init__(self, agent_id, budget, color="blue"):
-#         self.enable_assertions = True
-#         self.hist_out = None
-#         self.id = agent_id
-#         self.budget = budget
-#         self.color = "blue"
-
-#         self.batch_size = 50
-#         self.is_deterministic = False
-#         self.is_trainable = True
-
-#         self.validation_change_threshold = 1e-5
-#         self.best_validation_changed_step = -1
-#         self.best_validation_loss = float("inf")
-
-#         self.pos = 0
-#         self.step = 0
-#         self.hyperparams = self.get_default_hyperparameters()
-#         self.net = QNet(self.hyperparams)
-#         self.old_net = QNet(self.hyperparams)
-
-#     def get_default_hyperparameters(self):
-#         hyperparams = {'learning_rate': 0.0001,
-#                        'epsilon_start': 1,
-#                        'mem_pool_to_steps_ratio': 1,
-#                        'latent_dim': 64,
-#                        'hidden': 32,
-#                        'embedding_method': 'mean_field',
-#                        'max_lv': 3,
-#                        'eps_step_denominator': 10}
-#         return hyperparams
-    
-#     def take_snapshot(self):
-#         self.old_net.load_state_dict(self.net.state_dict())
-
-#     def train(self, max_steps):
-
-#         if len(self.memory) < self.batch_size:
-#             return
-
-#         # Setup
-#         self.setup_mem_pool(max_steps, self.hyperparams['mem_pool_to_steps_ratio'])
-#         self.setup_training_parameters(max_steps)
-
-#         # Burn-in
-#         pbar = tqdm(range(self.burn_in), unit='batch', disable=None)
-#         for p in pbar:
-#             with torch.no_grad():
-#                 self.run_simulation()
-
-#         pbar = tqdm(range(max_steps + 1), unit='steps', disable=None)
-#         optimizer = optim.Adam(self.net.parameters(), lr=self.learning_rate)
-
-#         for self.step in pbar:
-#             with torch.no_grad():
-#                 self.run_simulation()
-#             if self.step % self.net_copy_interval == 0:
-#                 self.take_snapshot()
-#             # self.check_validation_loss(self.step, max_steps)
-
-#             batch = random.sample(self.memory, self.batch_size)
-#             states, actions, rewards, next_states, dones = zip(*batch)
-
-#             cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.mem_pool.sample(
-#                 batch_size=self.batch_size)
-#             list_target = torch.Tensor(list_rt)
-#             cleaned_sp = []
-#             nonterms = []
-#             for i in range(len(list_st)):
-#                 if not list_term[i]:
-#                     cleaned_sp.append(list_s_primes[i])
-#                     nonterms.append(i)
-
-#             if len(cleaned_sp):
-#                 _, _, banned = zip(*cleaned_sp)
-#                 _, q_t_plus_1, prefix_sum_prime = self.old_net((cur_time + 1) % 2, cleaned_sp, None)
-#                 _, q_rhs = greedy_actions(q_t_plus_1, prefix_sum_prime, banned)
-#                 list_target[nonterms] = q_rhs
-
-#             list_target = Variable(list_target.view(-1, 1))
-#             _, q_sa, _ = self.net(cur_time % 2, list_st, list_at)
-
-#             loss = F.mse_loss(q_sa, list_target)
-#             optimizer.zero_grad()
-#             loss.backward()
-#             optimizer.step()
-#             pbar.set_description('exp: %.5f, loss: %0.5f' % (self.eps, loss))
-
-#             # should_stop = self.check_stopping_condition(self.step, max_steps)
-#             # if should_stop:
-#             #     break
-
-#     def setup_mem_pool(self, num_steps, mem_pool_to_steps_ratio):
-#         exp_replay_size = int(num_steps * mem_pool_to_steps_ratio)
-#         self.memory = deque(maxlen=exp_replay_size)
-
-#     def setup_training_parameters(self, max_steps):
-#         self.learning_rate = self.hyperparams['learning_rate']
-#         self.eps_start = self.hyperparams['epsilon_start']
-
-#         eps_step_denominator = self.hyperparams['eps_step_denominator'] if 'eps_step_denominator' in self.hyperparams else 2
-#         self.eps_step = max_steps / eps_step_denominator
-#         self.eps_end = 0.1
-#         self.burn_in = 50
-#         self.net_copy_interval = 50
-
-#     def make_actions(self, t):
-
-#         self.eps = self.eps_end + max(0., (self.eps_start - self.eps_end)
-#                                         * (self.eps_step - max(0., self.step)) / self.eps_step)
-#         if random.random() < self.eps: # Explore
-
-#             # do explore action
-#             exploration_actions_t0, exploration_actions_t1 = self.environment.exploratory_actions(self.agent_exploration_policy)
-#             self.next_exploration_actions = exploration_actions_t1
-#             return exploration_actions_t0
-#         else: # Greedy
-
-#             # do greedy action
-#             greedy_acts = self.do_greedy_actions(t)
-#             self.next_exploration_actions = None
-#             return greedy_acts
-
-#     def do_greedy_actions(self, time_t):
-#         cur_state = self.environment.get_state_ref()
-#         actions, _, _ = self.net(time_t % 2, cur_state, None, greedy_acts=True)
-#         actions = list(actions.cpu().numpy())
-#         return actions
-
-#     def run_simulation(self):
-#         selected_idx = self.advance_pos_and_sample_indices()
-#         self.environment.setup([self.train_g_list[idx] for idx in selected_idx],
-#                            [self.train_initial_obj_values[idx] for idx in selected_idx],
-#                            training=True)
-#         self.post_env_setup()
-
-#         final_st = [None] * len(selected_idx)
-#         final_acts = np.empty(len(selected_idx), dtype=np.int); final_acts.fill(-1)
-
-#         t = 0
-#         while not self.environment.is_terminal():
-#             list_at = self.make_actions(t, greedy=False)
-
-#             non_exhausted_before, = np.where(~self.environment.exhausted_budgets)
-#             list_st = self.environment.clone_state(non_exhausted_before)
-#             self.environment.step(list_at)
-
-#             non_exhausted_after, = np.where(~self.environment.exhausted_budgets)
-#             exhausted_after, = np.where(self.environment.exhausted_budgets)
-
-#             nonterm_indices = np.flatnonzero(np.isin(non_exhausted_before, non_exhausted_after))
-#             nonterm_st = [list_st[i] for i in nonterm_indices]
-#             nonterm_at = [list_at[i] for i in non_exhausted_after]
-#             rewards = np.zeros(len(nonterm_at), dtype=np.float)
-#             nonterm_s_prime = self.environment.clone_state(non_exhausted_after)
-
-#             now_term_indices = np.flatnonzero(np.isin(non_exhausted_before, exhausted_after))
-#             term_st = [list_st[i] for i in now_term_indices]
-#             for i in range(len(term_st)):
-#                 g_list_index = non_exhausted_before[now_term_indices[i]]
-
-#                 final_st[g_list_index] = term_st[i]
-#                 final_acts[g_list_index] = list_at[g_list_index]
-
-#             if len(nonterm_at) > 0:
-#                 self.mem_pool.add_list(nonterm_st, nonterm_at, rewards, nonterm_s_prime, [False] * len(nonterm_at), t % 2)
-
-#             t += 1
-
-#         final_at = list(final_acts)
-#         rewards = self.environment.rewards
-#         final_s_prime = None
-#         self.mem_pool.add_list(final_st, final_at, rewards, final_s_prime, [True] * len(final_at), (t - 1) % 2)
-
-#     def get_default_hyperparameters(self):
-#         hyperparams = {'learning_rate': 0.0001,
-#                        'epsilon_start': 1,
-#                        'mem_pool_to_steps_ratio': 1,
-#                        'latent_dim': 64,
-#                        'hidden': 32,
-#                        'embedding_method': 'mean_field',
-#                        'max_lv': 3,
-#                        'eps_step_denominator': 10}
-#         return hyperparams
-
-
-
-
-
 
 

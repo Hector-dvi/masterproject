@@ -23,7 +23,7 @@ class RLEnv(Graph): # Multi Agent Competitive Diffusion
         self.current_step = 0
         self.influenced = {}
         if new_graph:
-            self.load_gaph(new_graph)
+            self.load_graph(new_graph)
         self.init_graph()
         return self.get_state()
     
@@ -71,8 +71,8 @@ class RLEnv(Graph): # Multi Agent Competitive Diffusion
         super().load_facebook_graph(graph_id)
         self.init_graph()
 
-    def load_gaph(self, graph):
-        super().load_gaph(graph)
+    def load_graph(self, graph):
+        super().load_graph(graph)
         self.init_graph()
 
     def init_graph(self):
@@ -103,7 +103,7 @@ class RLEnv(Graph): # Multi Agent Competitive Diffusion
     def display(self, with_labels=False, width=0.5, edge_color="gray", edgecolors="black"):
 
         if self.node_positions is None:
-            raise ValueError("Node positions not initialized.")
+            self.node_positions = nx.spring_layout(self.graph)
         
         node_colors = [
             "white" if self.graph.nodes[node]["state"] == "S" 

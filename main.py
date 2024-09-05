@@ -9,22 +9,21 @@ from agent import IMAgent, RLAgent
 from graph import GraphGenerator
 
 def set_seed(seed):
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
-def run_baseline(env, agent_id, episode_length, num_episodes):
+def run_baseline(env, agent_id, episode_length):
     rewards = np.array([])
-    for episode in range(num_episodes):
-        for g in env.train_graphs:
-            state = env.reset(new_graph=g)
-            for _ in range(episode_length):
-                _, _, _, done = env.step()
-                if done:
-                    reward = env.get_agent_influence_ratio(agent_id)
-                    rewards = np.append(rewards, reward)
+    for g in env.train_graphs:
+        env.reset(new_graph=g)
+        for _ in range(episode_length):
+            _, _, _, done = env.step()
+            if done:
+                reward = env.get_agent_influence_ratio(agent_id)
+                rewards = np.append(rewards, reward)
     return np.mean(rewards)
 
 def moving_average(data, window_size):
@@ -62,6 +61,17 @@ def train(env, episode_length, num_episodes, print_interval=100, save_model=Fals
         rl_agent.save_best_model("test")
     return average_rewards_train, average_rewards_validation
 
+def test(env, episode_length):
+    rewards = np.array([])
+    for g in env.train_graphs:
+        state = env.reset(new_graph=g)
+        for _ in range(episode_length):
+            _, _, _, done = env.step()
+            if done:
+                reward = env.get_agent_influence_ratio(agent_id)
+                rewards = np.append(rewards, reward)
+    return np.mean(rewards)
+
 
 # def plot_results(rewards, baseline_average, baseline):
 #     plt.plot(rewards)
@@ -85,21 +95,22 @@ def plot_results(average_rewards_train, average_rewards_validation, baseline_ave
 
 # Example usage
 if __name__ == "__main__":
+
     episode_length = 10
     budget = 1
-    n_episodes = 100
+    n_episodes = 2000
     seed = 1
 
     if seed is not None:
         set_seed(seed)
 
-    rl_agent = RLAgent(2, budget, 3, color="red")
-    im_agent = IMAgent(1, "degree_centrality", budget, color="blue")
-    agents = {1: im_agent, 2:rl_agent}
+    rl_agent = RLAgent(1, budget, 3, color="red")
+    im_agent = IMAgent(2, "degree_centrality", budget, color="blue")
+    agents = {1: rl_agent, 2: im_agent}
     environment = RLEnv(agents, diffusion_method="stochastic")
     graph_gen = GraphGenerator(0.7, 0.3, 0.)
     num_of_graphs = 10
-    possible_values_of_n = range(85,115)
+    possible_values_of_n = [100]
     possible_values_of_m = [3]
     train_graphs, validation_graphs, test_graphs = graph_gen.generate_ba(num_of_graphs, possible_values_of_n, possible_values_of_m)
     environment.setup_graphs(train_graphs, validation_graphs, test_graphs)
