@@ -32,8 +32,8 @@ class GCN1(torch.nn.Module): # good for mini graph
 class GCN2(torch.nn.Module):
     def __init__(self, num_node_features, num_classes):
         super(GCN2, self).__init__()
-        self.conv1 = GCNConv(num_node_features, 128)
-        self.conv2 = GCNConv(128, num_classes)
+        self.conv1 = GCNConv(num_node_features, 32)
+        self.conv2 = GCNConv(32, num_classes)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
